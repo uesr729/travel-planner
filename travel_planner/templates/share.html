@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}分享的行程 - {{ itinerary.destination }}{% endblock %}
+{% block content %}
+<div class="itinerary-page">
+    <!-- Share banner -->
+    <div class="share-banner">
+        <span class="share-badge">🔗 分享的行程</span>
+        <p class="share-notice">这是 {{ itinerary.destination }} 的旅行行程</p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary">✨ 创建自己的行程</a>
+    </div>
+
+    <!-- Title -->
+    <div class="itinerary-title">
+        <h1>🌍 {{ itinerary.destination }} — {{ itinerary.days }}天行程</h1>
+        <p class="itinerary-meta">
+            预算：¥{{ itinerary.budget }} |
+            偏好：{{ itinerary.preferences if itinerary.preferences else '无特定偏好' }}
+        </p>
+    </div>
+
+    <!-- Cost overview -->
+    {% if data.summary %}
+    <div class="cost-overview">
+        <div class="cost-card cost-total">
+            <div class="cost-label">总预算</div>
+            <div class="cost-value">¥{{ data.summary.total_budget }}</div>
+        </div>
+        <div class="cost-card cost-estimated">
+            <div class="cost-label">预估总花费</div>
+            <div class="cost-value">¥{{ data.summary.estimated_total }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🎫 景点门票</div>
+            <div class="cost-value">¥{{ data.summary.spots_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🍽 餐饮</div>
+            <div class="cost-value">¥{{ data.summary.meal_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🏨 住宿</div>
+            <div class="cost-value">¥{{ data.summary.accommodation_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🚌 交通</div>
+            <div class="cost-value">¥{{ data.summary.transport_cost }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Travel tips -->
+    {% if data.tips %}
+    <div class="tips-box">
+        <h3>💡 旅行建议</h3>
+        <ul>
+            {% for tip in data.tips %}
+            <li>{{ tip }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Map -->
+    <div class="map-section">
+        <div id="map" class="map-container"></div>
+    </div>
+
+    <!-- Daily cards -->
+    <div class="daily-cards">
+        {% if data.itinerary_days %}
+        {% for day in data.itinerary_days %}
+        <div class="day-card" data-day="{{ day.day_number }}">
+            <div class="day-header">
+                <h2 class="day-title">📅 {{ day.title }}</h2>
+                {% if weather and weather[loop.index0] %}
+                <span class="weather-badge">☁️ {{ weather[loop.index0].temp }}°C</span>
+                {% endif %}
+            </div>
+
+            <div class="day-spots">
+                {% if day.spots %}
+                {% for spot in day.spots %}
+                <div class="spot-item" data-lat="{{ spot.lat }}" data-lng="{{ spot.lng }}"
+                     data-name="{{ spot.name }}" data-cost="{{ spot.cost }}"
+                     data-desc="{{ spot.description }}">
+                    <div class="spot-header">
+                        <span class="spot-time">{{ spot.time_slot }} {{ spot.start_time }}-{{ spot.end_time }}</span>
+                        <span class="spot-category">{{ spot.category }}</span>
+                    </div>
+                    <div class="spot-body">
+                        <span class="spot-name">{{ spot.name }}</span>
+                        <span class="spot-cost">¥{{ spot.cost }}</span>
+                    </div>
+                    <p class="spot-desc">{{ spot.description }}</p>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">暂无景点信息</div>
+                {% endif %}
+            </div>
+
+            {% if day.meals %}
+            <div class="day-meals">
+                {% for meal in day.meals %}
+                <div class="meal-item">
+                    <span class="meal-type">🍽 {{ meal.type }}</span>
+                    <span class="meal-name">{{ meal.restaurant or meal.recommendation }}</span>
+                    <span class="meal-cost">¥{{ meal.cost }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if day.accommodation %}
+            <div class="day-accommodation">
+                <span class="acc-icon">🏨</span>
+                <span class="acc-name">{{ day.accommodation.name }}</span>
+                <span class="acc-cost">¥{{ day.accommodation.cost }}</span>
+                <span class="acc-note">{{ day.accommodation.note }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <p>暂无行程数据</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script id="map-data" type="application/json">{{ data.itinerary_days | tojson }}</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var mapDataEl = document.getElementById('map-data');
+    var days = [];
+    try {
+        days = JSON.parse(mapDataEl.textContent || '[]');
+    } catch(e) {
+        days = [];
+    }
+    initMap(days);
+});
+});
+</script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}AI 旅行规划师 - 生成行程{% endblock %}
+{% block content %}
+<div class="hero">
+    <h1 class="hero-title">🌍 AI 旅行规划师</h1>
+    <p class="hero-subtitle">告诉我想去哪、玩几天、预算多少，一键生成完整行程</p>
+</div>
+
+<div class="form-card">
+    <form action="{{ url_for('main.generate') }}" method="POST" class="travel-form" id="travelForm">
+        <div class="form-group">
+            <label for="destination" class="form-label">📍 目的地 <span class="required">*</span></label>
+            <input type="text" id="destination" name="destination" class="form-input"
+                   placeholder="例如：北京、成都、杭州..." required maxlength="200"
+                   autocomplete="off" list="city-suggestions">
+            <datalist id="city-suggestions">
+                <option value="北京"><option value="上海"><option value="广州">
+                <option value="深圳"><option value="成都"><option value="杭州">
+                <option value="西安"><option value="重庆"><option value="武汉">
+                <option value="南京"><option value="苏州"><option value="昆明">
+                <option value="丽江"><option value="三亚"><option value="厦门">
+                <option value="青岛"><option value="大连"><option value="长沙">
+                <option value="哈尔滨"><option value="拉萨"><option value="桂林">
+                <option value="敦煌">
+            </datalist>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="days" class="form-label">📅 旅行天数</label>
+                <select id="days" name="days" class="form-select">
+                    <option value="1">1 天</option>
+                    <option value="2">2 天</option>
+                    <option value="3" selected>3 天</option>
+                    <option value="4">4 天</option>
+                    <option value="5">5 天</option>
+                    <option value="6">6 天</option>
+                    <option value="7">7 天</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="budget" class="form-label">💰 预算（元）</label>
+                <select id="budget" name="budget" class="form-select">
+                    <option value="1000">1000 元（经济）</option>
+                    <option value="2000">2000 元（简约）</option>
+                    <option value="3000" selected>3000 元（舒适）</option>
+                    <option value="5000">5000 元（品质）</option>
+                    <option value="8000">8000 元（奢华）</option>
+                    <option value="10000">10000+ 元（土豪）</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="preferences" class="form-label">❤️ 偏好（可选）</label>
+            <input type="text" id="preferences" name="preferences" class="form-input"
+                   placeholder="例如：美食、文化、自然、购物、亲子..." maxlength="500">
+            <div class="pref-tags">
+                <span class="pref-tag" data-value="美食">美食</span>
+                <span class="pref-tag" data-value="文化">文化</span>
+                <span class="pref-tag" data-value="自然">自然</span>
+                <span class="pref-tag" data-value="购物">购物</span>
+                <span class="pref-tag" data-value="亲子">亲子</span>
+                <span class="pref-tag" data-value="历史">历史</span>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-generate" id="generateBtn">
+            ✨ 生成行程
+        </button>
+    </form>
+
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">🤖 AI 正在为您规划行程...</p>
+        <p class="loading-subtext">正在分析目的地和生成最优路线</p>
+    </div>
+</div>
+
+<div class="features">
+    <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>AI 智能规划</h3>
+        <p>接入 DeepSeek 大模型，根据您的偏好生成个性化行程</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">🗺️</div>
+        <h3>地图可视化</h3>
+        <p>Leaflet 地图标注所有景点，清晰展示每日路线</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>一键分享</h3>
+        <p>生成唯一分享链接，轻松分享给朋友和家人</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('travelForm');
+    const btn = document.getElementById('generateBtn');
+    const overlay = document.getElementById('loadingOverlay');
+    const prefInput = document.getElementById('preferences');
+    const prefTags = document.querySelectorAll('.pref-tag');
+
+    // Preference tag selection
+    prefTags.forEach(function(tag) {
+        tag.addEventListener('click', function() {
+            const value = this.dataset.value;
+            const current = prefInput.value;
+            const tags = current ? current.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+            if (this.classList.contains('active')) {
+                this.classList.remove('active');
+                const idx = tags.indexOf(value);
+                if (idx > -1) tags.splice(idx, 1);
+            } else {
+                this.classList.add('active');
+                if (tags.indexOf(value) === -1) tags.push(value);
+            }
+            prefInput.value = tags.join(', ');
+        });
+    });
+
+    // Form submit - show loading overlay
+    form.addEventListener('submit', function(e) {
+        const dest = document.getElementById('destination').value.trim();
+        if (!dest) {
+            e.preventDefault();
+            alert('请输入目的地');
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = '⏳ 生成中...';
+        overlay.style.display = 'flex';
+    });
+});
+</script>
+{% endblock %}

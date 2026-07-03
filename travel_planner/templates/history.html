@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}AI 旅行规划师 - 历史记录{% endblock %}
+{% block content %}
+<div class="history-page">
+    <div class="page-header">
+        <h1>📋 历史行程</h1>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary">✨ 新建行程</a>
+    </div>
+
+    {% if itineraries %}
+    <div class="history-grid">
+        {% for item in itineraries %}
+        <a href="{{ url_for('main.view_itinerary', id=item.id) }}" class="history-card">
+            <div class="history-card-header">
+                <h3>🌍 {{ item.destination }}</h3>
+                <span class="history-days">{{ item.days }} 天</span>
+            </div>
+            <div class="history-card-body">
+                <div class="history-info">
+                    <span class="history-label">预算</span>
+                    <span class="history-value">¥{{ item.budget }}</span>
+                </div>
+                {% if item.preferences %}
+                <div class="history-info">
+                    <span class="history-label">偏好</span>
+                    <span class="history-value">{{ item.preferences }}</span>
+                </div>
+                {% endif %}
+                <div class="history-info">
+                    <span class="history-label">创建时间</span>
+                    <span class="history-value">{{ item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else '' }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state-card">
+        <div class="empty-icon">🗺️</div>
+        <h2>还没有生成过行程</h2>
+        <p>点击下方按钮，开始你的第一次旅行规划吧！</p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg">✨ 生成第一个行程</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

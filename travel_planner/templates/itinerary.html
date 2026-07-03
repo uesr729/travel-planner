@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}AI 旅行规划师 - {{ itinerary.destination }}行程{% endblock %}
+{% block content %}
+<div class="itinerary-page">
+    <!-- Action bar -->
+    <div class="action-bar">
+        <a href="javascript:history.back()" class="btn btn-secondary">← 返回</a>
+        <div class="action-right">
+            <button class="btn btn-secondary" onclick="window.print()">🖨 打印/导出PDF</button>
+            <button class="btn btn-primary" id="shareBtn" data-share-link="{{ url_for('main.share_itinerary', token=itinerary.share_token, _external=True) }}">
+                🔗 复制分享链接
+            </button>
+        </div>
+    </div>
+
+    <!-- Title -->
+    <div class="itinerary-title">
+        <h1>🌍 {{ itinerary.destination }} — {{ itinerary.days }}天行程</h1>
+        <p class="itinerary-meta">
+            预算：¥{{ itinerary.budget }} |
+            偏好：{{ itinerary.preferences if itinerary.preferences else '无特定偏好' }} |
+            创建时间：{{ itinerary.created_at.strftime('%Y-%m-%d %H:%M') if itinerary.created_at else '' }}
+        </p>
+    </div>
+
+    <!-- Cost overview -->
+    {% if data.summary %}
+    <div class="cost-overview">
+        <div class="cost-card cost-total">
+            <div class="cost-label">总预算</div>
+            <div class="cost-value">¥{{ data.summary.total_budget }}</div>
+        </div>
+        <div class="cost-card cost-estimated">
+            <div class="cost-label">预估总花费</div>
+            <div class="cost-value">¥{{ data.summary.estimated_total }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🎫 景点门票</div>
+            <div class="cost-value">¥{{ data.summary.spots_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🍽 餐饮</div>
+            <div class="cost-value">¥{{ data.summary.meal_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🏨 住宿</div>
+            <div class="cost-value">¥{{ data.summary.accommodation_cost }}</div>
+        </div>
+        <div class="cost-card">
+            <div class="cost-label">🚌 交通</div>
+            <div class="cost-value">¥{{ data.summary.transport_cost }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Travel tips -->
+    {% if data.tips %}
+    <div class="tips-box">
+        <h3>💡 旅行建议</h3>
+        <ul>
+            {% for tip in data.tips %}
+            <li>{{ tip }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Map -->
+    <div class="map-section">
+        <div id="map" class="map-container"></div>
+    </div>
+
+    <!-- Daily cards -->
+    <div class="daily-cards">
+        {% if data.itinerary_days %}
+        {% for day in data.itinerary_days %}
+        <div class="day-card" data-day="{{ day.day_number }}">
+            <div class="day-header">
+                <h2 class="day-title">📅 {{ day.title }}</h2>
+                {% if weather and weather[loop.index0] %}
+                <span class="weather-badge">
+                    ☁️ {{ weather[loop.index0].temp }}°C
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Spots -->
+            <div class="day-spots">
+                {% if day.spots %}
+                {% for spot in day.spots %}
+                <div class="spot-item" data-lat="{{ spot.lat }}" data-lng="{{ spot.lng }}"
+                     data-name="{{ spot.name }}" data-cost="{{ spot.cost }}"
+                     data-desc="{{ spot.description }}">
+                    <div class="spot-header">
+                        <span class="spot-time">{{ spot.time_slot }} {{ spot.start_time }}-{{ spot.end_time }}</span>
+                        <span class="spot-category">{{ spot.category }}</span>
+                    </div>
+                    <div class="spot-body">
+                        <span class="spot-name">{{ spot.name }}</span>
+                        <span class="spot-cost">¥{{ spot.cost }}</span>
+                    </div>
+                    <p class="spot-desc">{{ spot.description }}</p>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">暂无景点信息</div>
+                {% endif %}
+            </div>
+
+            <!-- Meals -->
+            {% if day.meals %}
+            <div class="day-meals">
+                {% for meal in day.meals %}
+                <div class="meal-item">
+                    <span class="meal-type">🍽 {{ meal.type }}</span>
+                    <span class="meal-name">{{ meal.restaurant or meal.recommendation }}</span>
+                    <span class="meal-cost">¥{{ meal.cost }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Accommodation -->
+            {% if day.accommodation %}
+            <div class="day-accommodation">
+                <span class="acc-icon">🏨</span>
+                <span class="acc-name">{{ day.accommodation.name }}</span>
+                <span class="acc-cost">¥{{ day.accommodation.cost }}</span>
+                <span class="acc-note">{{ day.accommodation.note }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <p>暂无行程数据</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script id="map-data" type="application/json">{{ data.itinerary_days | tojson }}</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Map initialization - safely parse JSON from script tag
+    var mapDataEl = document.getElementById('map-data');
+    var days = [];
+    try {
+        days = JSON.parse(mapDataEl.textContent || '[]');
+    } catch(e) {
+        days = [];
+    }
+    initMap(days);
+
+    // Share button
+    const shareBtn = document.getElementById('shareBtn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function() {
+            const link = this.dataset.shareLink;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link).then(function() {
+                    alert('✅ 分享链接已复制！');
+                }).catch(function() {
+                    fallbackCopy(link);
+                });
+            } else {
+                fallbackCopy(link);
+            }
+        });
+    }
+
+    function fallbackCopy(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            alert('✅ 分享链接已复制！');
+        } catch (e) {
+            prompt('请手动复制链接：', text);
+        }
+        document.body.removeChild(textarea);
+    }
+});
+</script>
+{% endblock %}

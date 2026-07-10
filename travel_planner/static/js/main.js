@@ -31,19 +31,46 @@ function initMap(days) {
 
     if (allSpots.length === 0) return;
 
+    // Filter out spots with invalid coordinates (0,0 or NaN)
+    var validSpots = allSpots.filter(function(spot) {
+        return spot.lat && spot.lng &&
+               !isNaN(spot.lat) && !isNaN(spot.lng) &&
+               (Math.abs(spot.lat) > 0.001 || Math.abs(spot.lng) > 0.001);
+    });
+
+    if (validSpots.length === 0) {
+        // Fallback: if all spots had bad coordinates, center on a default China view
+        var map = L.map('map', {
+            center: [35.86, 104.19],
+            zoom: 4,
+            zoomControl: true,
+            attributionControl: false
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+        return;
+    }
+
     // Calculate map bounds
     var bounds = L.latLngBounds();
-    allSpots.forEach(function(spot) {
+    validSpots.forEach(function(spot) {
         bounds.extend([spot.lat, spot.lng]);
     });
 
-    // Initialize map with Gaode (AMap) tile layer
+    // Initialize map
     var map = L.map('map', {
         zoomControl: true,
         attributionControl: false
     }).fitBounds(bounds, { padding: [40, 40] });
 
-    // Use OpenStreetMap tile layer (better compatibility)
+    // Set minZoom if bounds are too small (single point)
+    if (bounds.isValid && !bounds.isValid()) {
+        map.setZoom(13);
+    }
+
+    // Use OpenStreetMap tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

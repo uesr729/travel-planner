@@ -1,32 +1,10 @@
-# Environment
-.env
-*.env
-
-# Database
-*.db
-*.sqlite
-
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Test & Coverage
+*.pyc
+.venv/
+venv/
+*.db
+instance/
+.env
 .pytest_cache/
-htmlcov/
-.coverage
-coverage/
+workspace/
+.idea/

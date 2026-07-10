@@ -22,3 +22,7 @@ class Config:
 
     # OpenWeather API
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+
+    # 高德地图 Web 服务 API (用于获取真实景点 POI 数据)
+    # 申请地址: https://lbs.amap.com/ → 控制台 → 应用管理 → 创建新应用 → 添加 Key (Web服务)
+    AMAP_API_KEY = os.getenv("AMAP_API_KEY", "")

@@ -2,10 +2,16 @@
 
 Contains built-in data for 20+ Chinese cities and detailed itinerary data
 for 5 core cities (Beijing, Shanghai, Chengdu, Xi'an, Hangzhou).
+
+IMPORTANT: The `generate_mock_itinerary()` function is updated to prioritise
+real POI (Point of Interest) data from the Amap API when available.
 """
 import random
 import json
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -366,14 +372,142 @@ def _generate_daily_itinerary(
     }
 
 
+def _build_generic_city_data(city: str) -> dict:
+    """Build reasonable generic city data for any city not in CITY_DATA.
+
+    Generates spots, restaurants, and accommodations dynamically using the city name,
+    so users can input any destination and get a meaningful itinerary.
+    """
+    # Try to get city-level coordinates for reasonable map display
+    coords = get_city_coords(city)
+    base_lat = coords["lat"] if coords else 30.0
+    base_lng = coords["lng"] if coords else 110.0
+
+    # Generate spots with small random offsets from city center for visual spread
+    random.seed(city)  # deterministic per city
+    offsets = [
+        (random.uniform(-0.03, 0.03), random.uniform(-0.03, 0.03)) for _ in range(10)
+    ]
+    random.seed()  # reset seed
+
+    # Generic spot templates that work for any city
+    generic_spots = [
+        {"name": f"{city}市中心广场", "lat": round(base_lat + offsets[0][0], 4),
+         "lng": round(base_lng + offsets[0][1], 4), "cost": 0,
+         "category": "景点", "description": f"{city}的城市中心，感受当地氛围"},
+        {"name": f"{city}老街", "lat": round(base_lat + offsets[1][0], 4),
+         "lng": round(base_lng + offsets[1][1], 4), "cost": 0,
+         "category": "美食", "description": f"体验{city}传统风情，品尝地道小吃"},
+        {"name": f"{city}博物馆", "lat": round(base_lat + offsets[2][0], 4),
+         "lng": round(base_lng + offsets[2][1], 4), "cost": 30,
+         "category": "文化", "description": f"了解{city}的历史文化与发展变迁"},
+        {"name": f"{city}公园", "lat": round(base_lat + offsets[3][0], 4),
+         "lng": round(base_lng + offsets[3][1], 4), "cost": 0,
+         "category": "自然", "description": f"{city}最大的城市公园，休闲散步好去处"},
+        {"name": f"{city}艺术中心", "lat": round(base_lat + offsets[4][0], 4),
+         "lng": round(base_lng + offsets[4][1], 4), "cost": 20,
+         "category": "艺术", "description": f"{city}的文艺地标，展览与演出不断"},
+        {"name": f"{city}购物步行街", "lat": round(base_lat + offsets[5][0], 4),
+         "lng": round(base_lng + offsets[5][1], 4), "cost": 0,
+         "category": "购物", "description": f"{city}最繁华的商业街，时尚与美食汇聚"},
+        {"name": f"{city}滨江/湖畔步道", "lat": round(base_lat + offsets[6][0], 4),
+         "lng": round(base_lng + offsets[6][1], 4), "cost": 0,
+         "category": "自然", "description": f"漫步{city}水岸，欣赏城市天际线"},
+        {"name": f"{city}古寺/古塔", "lat": round(base_lat + offsets[7][0], 4),
+         "lng": round(base_lng + offsets[7][1], 4), "cost": 25,
+         "category": "历史", "description": f"{city}的历史古迹，感受岁月沉淀"},
+        {"name": f"{city}夜市", "lat": round(base_lat + offsets[8][0], 4),
+         "lng": round(base_lng + offsets[8][1], 4), "cost": 0,
+         "category": "美食", "description": f"{city}最热闹的夜市，各种美食琳琅满目"},
+        {"name": f"{city}观景台", "lat": round(base_lat + offsets[9][0], 4),
+         "lng": round(base_lng + offsets[9][1], 4), "cost": 50,
+         "category": "景点", "description": f"登高俯瞰{city}全景，城市风光尽收眼底"},
+    ]
+
+    generic_restaurants = [
+        {"name": f"{city}本地餐厅", "cost": 80, "type": "午餐",
+         "recommendation": f"品尝{city}地道美食，招牌菜值得一试"},
+        {"name": f"{city}特色小吃店", "cost": 30, "type": "早餐",
+         "recommendation": f"{city}特色早点，开启美好一天"},
+        {"name": f"{city}老字号酒楼", "cost": 120, "type": "晚餐",
+         "recommendation": f"{city}口碑老店，经典菜品不容错过"},
+        {"name": f"{city}网红餐厅", "cost": 90, "type": "午餐",
+         "recommendation": f"{city}人气餐厅，环境优雅味道好"},
+        {"name": f"{city}夜市大排档", "cost": 60, "type": "晚餐",
+         "recommendation": f"{city}最接地气的路边美食"},
+        {"name": f"{city}早茶/早点铺", "cost": 25, "type": "早餐",
+         "recommendation": f"{city}传统早点，品种丰富"},
+        {"name": f"{city}融合菜馆", "cost": 100, "type": "晚餐",
+         "recommendation": f"{city}创新融合菜，味蕾新体验"},
+    ]
+
+    generic_accommodations = [
+        {"name": f"{city}市中心酒店", "cost": 280, "note": f"位于{city}核心区域，交通便利"},
+        {"name": f"{city}精品民宿", "cost": 220, "note": f"温馨舒适，体验{city}本地生活"},
+        {"name": f"{city}景观酒店", "cost": 350, "note": f"高层观景房，俯瞰{city}美景"},
+    ]
+
+    return {
+        "spots": generic_spots,
+        "restaurants": generic_restaurants,
+        "accommodations": generic_accommodations,
+    }
+
+
+def _build_city_data_with_real_poi(city: str) -> dict:
+    """Build city data, prioritising real POI from Amap API.
+
+    1. Try to fetch real attractions via Amap API
+    2. On success: merge real spots with preset/generic food & accommodation
+    3. On failure: fall back to preset data (known city) or generic data (unknown city)
+    """
+    # Start with a base that has restaurants and accommodations
+    if city in CITY_DATA:
+        # Known city: clone preset data (we may replace spots with real POI)
+        base = {
+            "spots": list(CITY_DATA[city]["spots"]),
+            "restaurants": list(CITY_DATA[city]["restaurants"]),
+            "accommodations": list(CITY_DATA[city]["accommodations"]),
+        }
+    else:
+        base = _build_generic_city_data(city)
+
+    # Try to get real POI attractions from Amap
+    try:
+        from travel_planner.services.poi_service import search_attractions
+
+        real_pois = search_attractions(city)
+        if real_pois and len(real_pois) >= 3:
+            logger.info(
+                f"Using {len(real_pois)} real POIs from Amap API for '{city}'"
+            )
+            base["spots"] = real_pois
+        else:
+            logger.info(
+                f"Amap returned {len(real_pois) if real_pois else 0} POIs "
+                f"for '{city}' (need >= 3), keeping local data"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to fetch real POI for '{city}': {e}")
+
+    return base
+
+
 def generate_mock_itinerary(
     destination: str, days: int, budget: int, preferences: str = ""
 ) -> str:
     """Generate a complete mock itinerary for the given destination.
 
+    Data priority:
+      1. Real POI from Amap API (if AMAP_API_KEY configured) → real attractions
+      2. City-specific preset data (Beijing, Shanghai, etc.)
+      3. Dynamically generated generic data (any other city)
+
+    Falls back to the next level if the higher one fails.
+
     Returns a JSON string matching the expected itinerary schema.
     """
-    city_data = CITY_DATA.get(destination, CITY_DATA["北京"])
+    city_data = _build_city_data_with_real_poi(destination)
 
     # Select and distribute spots
     selected_spots = _select_spots(city_data, preferences, days)

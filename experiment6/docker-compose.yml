@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: travel-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: travel
+      POSTGRES_PASSWORD: travel123
+      POSTGRES_DB: travel_planner
+    ports:
+      - "5432:5432"
+    volumes:
+      - travel_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travel -d travel_planner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - travel_network
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: travel-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://travel:travel123@db:5432/travel_planner
+      FLASK_SECRET_KEY: travel-planner-docker-secret-2026
+      FLASK_DEBUG: "0"
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    networks:
+      - travel_network
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: travel-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "80:80"
+    networks:
+      - travel_network
+networks:
+  travel_network:
+    driver: bridge
+volumes:
+  travel_db_data:

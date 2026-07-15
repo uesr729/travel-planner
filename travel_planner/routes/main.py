@@ -2,7 +2,7 @@
 import json
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from travel_planner import db
+from travel_planner import db, limiter
 from travel_planner.models import Itinerary
 from travel_planner.services.llm_service import generate_itinerary
 from travel_planner.services.weather import get_weather
@@ -28,6 +28,7 @@ def index():
 
 
 @main_bp.route("/generate", methods=["POST"])
+@limiter.limit("5 per minute")
 def generate():
     """Handle itinerary generation form submission."""
     destination = request.form.get("destination", "").strip()
@@ -56,12 +57,13 @@ def generate():
     db.session.add(itinerary)
     db.session.commit()
 
-    return redirect(url_for("main.view_itinerary", id=itinerary.id))
+    # Redirect via share token to prevent ID enumeration
+    return redirect(url_for("main.share_itinerary", token=itinerary.share_token))
 
 
 @main_bp.route("/itinerary/<int:id>")
 def view_itinerary(id):
-    """View a specific itinerary."""
+    """View a specific itinerary (maintained for history links)."""
     itinerary = Itinerary.query.get_or_404(id)
     data = itinerary.to_dict()
 
@@ -95,8 +97,14 @@ def share_itinerary(token):
 
 @main_bp.route("/history")
 def history():
-    """View all past itineraries."""
-    itineraries = (
-        Itinerary.query.order_by(Itinerary.created_at.desc()).all()
+    """View past itineraries with pagination."""
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        Itinerary.query.order_by(Itinerary.created_at.desc())
+        .paginate(page=page, per_page=10, error_out=False)
     )
-    return render_template("history.html", itineraries=itineraries)
+    return render_template(
+        "history.html",
+        itineraries=pagination.items,
+        pagination=pagination,
+    )

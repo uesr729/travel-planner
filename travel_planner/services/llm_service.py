@@ -135,6 +135,12 @@ def generate_itinerary(
 
         return json.dumps(parsed, ensure_ascii=False)
 
+    except openai.APIError as e:
+        logger.warning(f"DeepSeek API error: {e}, falling back to mock data")
+        return generate_mock_itinerary(destination, days, budget, preferences)
+    except json.JSONDecodeError as e:
+        logger.warning(f"LLM returned invalid JSON: {e}, falling back to mock data")
+        return generate_mock_itinerary(destination, days, budget, preferences)
     except Exception as e:
-        logger.warning(f"LLM API call failed: {e}, falling back to mock data")
+        logger.error(f"Unexpected error in itinerary generation: {e}", exc_info=True)
         return generate_mock_itinerary(destination, days, budget, preferences)

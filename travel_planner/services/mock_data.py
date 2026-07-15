@@ -523,6 +523,10 @@ def generate_mock_itinerary(
     """
     city_data = _build_city_data_with_real_poi(destination)
 
+    # Save originals for fallback (avoid empty list crash)
+    _backup_restaurants = list(city_data["restaurants"])
+    _backup_accommodations = list(city_data["accommodations"])
+
     # Budget-aware cost selection: filter restaurants and accommodations by tier
     tier = _get_budget_tier(budget, days)
     if tier == "budget":
@@ -534,6 +538,12 @@ def generate_mock_itinerary(
     else:  # luxury
         city_data["restaurants"] = [r for r in city_data["restaurants"] if r["cost"] >= 80]
         city_data["accommodations"] = [a for a in city_data["accommodations"] if a["cost"] >= 300]
+
+    # Fallback: if filtering emptied the list, keep originals to avoid crash
+    if not city_data["restaurants"]:
+        city_data["restaurants"] = _backup_restaurants
+    if not city_data["accommodations"]:
+        city_data["accommodations"] = _backup_accommodations
 
     # Select and distribute spots
     selected_spots = _select_spots(city_data, preferences, days)

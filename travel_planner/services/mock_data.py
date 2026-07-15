@@ -545,6 +545,19 @@ def generate_mock_itinerary(
     if not city_data["accommodations"]:
         city_data["accommodations"] = _backup_accommodations
 
+    # Scale costs to match budget expectations
+    # Calculate base daily cost (3 meals + accommodation)
+    def _avg(items, key):
+        return sum(i[key] for i in items) / max(1, len(items))
+    base_daily = _avg(city_data["restaurants"], "cost") * 3 + _avg(city_data["accommodations"], "cost")
+    target_daily = budget * 0.7 / max(1, days)  # aim for ~70% of budget
+    if base_daily > 0 and target_daily > base_daily:
+        scale = min(target_daily / base_daily, 4.0)  # cap at 4x
+        for r in city_data["restaurants"]:
+            r["cost"] = int(r["cost"] * scale)
+        for a in city_data["accommodations"]:
+            a["cost"] = int(a["cost"] * scale)
+
     # Select and distribute spots
     selected_spots = _select_spots(city_data, preferences, days)
     spots_per_day = max(2, min(3, len(selected_spots) // max(1, days)))
